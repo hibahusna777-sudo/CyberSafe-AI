@@ -1,5 +1,7 @@
 # 🛡️ CyberSafe AI
 
+![CyberSafe AI Dashboard](assets/dashboard.png)
+
 An AI-powered Cyber Security Assistant built using Python and Streamlit.
 
 ## Features
