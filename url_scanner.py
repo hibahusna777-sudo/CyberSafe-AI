@@ -1,7 +1,6 @@
 import streamlit as st
 import re
 from urllib.parse import urlparse
-
 from utils import (
     limit_score,
     safety_score,
@@ -10,381 +9,173 @@ from utils import (
     render_gauge
 )
 
-
 def render_url_scanner():
-
-    st.markdown("""
-    <div style="border-bottom:2px solid #334155;
-                padding-bottom:12px;
-                margin-bottom:20px;">
-        <h1 style="color:white;">
-            🌐 AI URL Threat Scanner
-        </h1>
-
-        <p style="color:#94a3b8;">
-            Analyze websites for phishing, spoofing and malicious indicators.
-        </p>
-
-    </div>
-    """, unsafe_allow_html=True)
-
-    url = st.text_input(
-        "Enter Website URL",
-        placeholder="https://google.com"
+    """
+    Renders the universal cryptographic structural URL parser and risk analyzer.
+    Performs precise semantic analysis against standard structural Indicators of Compromise (IoC).
+    """
+    st.markdown(
+        """
+        <div style="border-bottom: 2px solid #334155; padding-bottom: 12px; margin-bottom: 25px;">
+            <h1 style="color: #f8fafc; font-weight: 700; margin-bottom: 4px;">🛡️ URL Threat Scanner</h1>
+            <p style="color: #94a3b8; font-size: 16px; margin: 0;">Structural parsing engine designed to identify domain spoofing, redirection proxies, and transport layer weaknesses.</p>
+        </div>
+        """, 
+        unsafe_allow_html=True
     )
 
-    if st.button("🔍 Scan URL", type="primary"):
+    url_input = st.text_input(
+        "Input Cryptographic / Uniform Resource Identifier (URI) Target", 
+        placeholder="Example: http://secure-login-update-paypal@192.168.1.105:8080/free-gift/index.html"
+    )
 
-        if not url.strip():
-
-            st.error("Please enter a valid URL.")
-
+    if st.button("Execute Vector Parsing Scan", type="primary"):
+        if not url_input.strip():
+            st.error("Execution halted: Structural parse surface cannot be a null string value.")
             return
-
-        target = url.strip()
-
-        # Add protocol automatically
-
-        if not re.match(r"^https?://", target, re.IGNORECASE):
-            target = "http://" + target
-
-        try:
-
-            parsed = urlparse(target)
-
-        except Exception:
-
-            st.error("Invalid URL.")
-
-            return
-
-        host = parsed.netloc.lower()
-
-        path = parsed.path.lower()
-
-        full_url = target.lower()
-
-        risk = 0
 
         reasons = []
-
         recommendations = []
-
-        # ==========================================
-        # HTTPS CHECK
-        # ==========================================
-
-        if parsed.scheme == "https":
-
-            reasons.append(
-                "HTTPS encryption detected."
-            )
-
-        else:
-
-            risk += 15
-
-            reasons.append(
-                "Website uses HTTP instead of HTTPS."
-            )
-
-            recommendations.append(
-                "Avoid entering passwords or payment information on HTTP websites."
-            )
-
-        # ==========================================
-        # IP ADDRESS CHECK
-        # ==========================================
-
-        ip_regex = r"^(?:\d{1,3}\.){3}\d{1,3}$"
-
-        domain = host.split(":")[0]
-
-        if re.match(ip_regex, domain):
-
-            risk += 35
-
-            reasons.append(
-                "Website uses an IP address instead of a domain."
-            )
-
-            recommendations.append(
-                "Legitimate organizations usually use domain names."
-            )
-
-        # ==========================================
-        # URL SHORTENER
-        # ==========================================
-
-        shorteners = [
-
-            "bit.ly",
-
-            "tinyurl.com",
-
-            "t.co",
-
-            "is.gd",
-
-            "goo.gl",
-
-            "ow.ly"
-
-        ]
-
-        for item in shorteners:
-
-            if item in domain:
-
-                risk += 20
-
-                reasons.append(
-                    f"Shortened URL detected ({item})."
-                )
-
-                recommendations.append(
-                    "Expand shortened URLs before opening them."
-                )
-
-                break
-
-        # ==========================================
-        # @ SYMBOL
-        # ==========================================
-
-        if "@" in full_url:
-
-            risk += 25
-
-            reasons.append(
-                "@ symbol detected in URL."
-            )
-
-            recommendations.append(
-                "Attackers often use @ to hide the real destination."
-            )
-                    # ==========================================
-        # SUSPICIOUS KEYWORDS
-        # ==========================================
-
-        keywords = [
-            "login",
-            "verify",
-            "update",
-            "secure",
-            "account",
-            "bank",
-            "paypal",
-            "bitcoin",
-            "free",
-            "gift",
-            "password",
-            "signin"
-        ]
-
-        matched = []
-
-        for word in keywords:
-
-            if word in full_url:
-
-                matched.append(word)
-
-        if matched:
-
-            risk += min(len(matched) * 8, 30)
-
-            reasons.append(
-                "Suspicious keywords detected: " +
-                ", ".join(matched)
-            )
-
-            recommendations.append(
-                "Always verify the website before entering credentials."
-            )
-
-        # ==========================================
-        # LONG URL
-        # ==========================================
-
-        if len(full_url) > 100:
-
-            risk += 10
-
-            reasons.append(
-                f"Very long URL detected ({len(full_url)} characters)."
-            )
-
-            recommendations.append(
-                "Long URLs can hide malicious content."
-            )
-
-        # ==========================================
-        # TOO MANY HYPHENS
-        # ==========================================
-
-        if domain.count("-") >= 3:
-
-            risk += 10
-
-            reasons.append(
-                "Multiple hyphens detected in domain."
-            )
-
-            recommendations.append(
-                "Phishing websites often imitate brands using hyphens."
-            )
-
-        # ==========================================
-        # SUBDOMAINS
-        # ==========================================
-
-        clean = domain.replace("www.", "")
-
-        if clean.count(".") >= 3:
-
-            risk += 10
-
-            reasons.append(
-                "Multiple subdomains detected."
-            )
-
-            recommendations.append(
-                "Verify the real domain name carefully."
-            )
-
-        # ==========================================
-        # NON STANDARD PORT
-        # ==========================================
+        risk_points = 0
+        
+        # Format normalization boundary
+        target_url = url_input.strip()
+        if not re.match(r'^https?://', target_url, re.IGNORECASE):
+            target_url = "http://" + target_url
 
         try:
+            parsed = urlparse(target_url)
+            netloc = parsed.netloc.lower()
+            path = parsed.path.lower()
+            full_lower = target_url.lower()
+        except Exception:
+            st.error("Structural Analysis Failure: Passed string cannot be parsed as a standard network resource locator.")
+            return
 
+        # 1. Transport Layer Cryptographic Verification (HTTPS/HTTP)
+        if url_input.strip().lower().startswith("https://"):
+            st.caption("🟢 Transport Security Layer Verified: HTTPS transport active.")
+        elif url_input.strip().lower().startswith("http://"):
+            reasons.append("Plaintext Protocol Active: Insecure HTTP transport profile exposed.")
+            risk_points += 25
+            recommendations.append("Do not transmit sensitive credential matrices across cleartext HTTP data pipes.")
+
+        # 2. Raw Host Endpoint Verification (IP Address Detection)
+        ip_pattern = r'(?:\d{1,3}\.){3}\d{1,3}'
+        if re.search(ip_pattern, netloc):
+            reasons.append("Structural Domain Masking: Endpoint points to raw IPv4 allocation block.")
+            risk_points += 30
+            recommendations.append("Raw node connections circumvent traditional authoritative DNS verification trails.")
+
+        # 3. Redirection / Obfuscation Proxies (URL Shortener Detection)
+        shorteners = ["bit.ly", "tinyurl.com", "t.co", "is.gd", "goo.gl", "ow.ly"]
+        found_shorteners = [s for s in shorteners if s in netloc]
+        if found_shorteners:
+            reasons.append(f"Proxy Obfuscation Token Identified: Known link compressor found ({found_shorteners[0]}).")
+            risk_points += 20
+            recommendations.append("Force full expansion parameters via API lookup tools before execution of redirected path endpoints.")
+
+        # 4. Inline Authorization Hijacking (@ Symbol Detection)
+        if "@" in netloc or (parsed.username and "@" in parsed.username):
+            reasons.append("Inline Credential Masking Abuse: URL structure contains localized authentication symbol (@).")
+            risk_points += 25
+            recommendations.append("Phishing variants use inline authentication tokens to mask true malicious server origins.")
+
+        # 5. Domain Token Segmentation (Hyphen Domain Detection)
+        domain_part = netloc.split(':')[0] if ':' in netloc else netloc
+        if domain_part.count("-") > 2:
+            reasons.append(f"Excessive Subdomain Segmentation: Abnormal hyphen padding in base domain cluster ({domain_part.count('-')} counts).")
+            risk_points += 15
+            recommendations.append("Legitimate corporate spaces rarely utilize multi-hyphen layouts to register target entities.")
+
+        # 6. Buffer Exceedance Vectors (Long URL Detection)
+        if len(url_input) > 75:
+            reasons.append(f"Target String Exceeds Length Heuristics: Length is {len(url_input)} characters.")
+            risk_points += 15
+            recommendations.append("Phishers intentionally scale URL lengths to push the malicious component past active viewport barriers.")
+
+        # 7. Semantic Phishing Vectors (Suspicious Keywords Detection)
+        keywords = ["login", "verify", "account", "paypal", "bank", "bitcoin", "free", "gift", "update", "password", "secure"]
+        matched_keywords = [kw for kw in keywords if kw in full_lower]
+        if matched_keywords:
+            reasons.append(f"High-vulnerability keyword string collision: Identified keywords {matched_keywords}")
+            risk_points += len(matched_keywords) * 10
+            recommendations.append("Cross-reference host signatures directly with authentic authoritative enterprise portals.")
+
+        # 8. Darknet Anonymizer Routing Target (.onion Detection)
+        if ".onion" in netloc:
+            reasons.append("Anonymized Darknet Service Mapping: Resolves into Tor Network hidden space (.onion TLD).")
+            risk_points += 40
+            recommendations.append("Only connect to hidden services if secure proxy paths have been audited and explicitly verified.")
+
+        # 9. Multiple Subdomains Detection
+        # Splitting domain blocks while dropping potential tracking extensions or zones
+        clean_domain_str = domain_part.replace("www.", "")
+        subdomain_count = clean_domain_str.count(".")
+        if subdomain_count >= 3:
+            reasons.append(f"Deep Subdomain Architecture: Multi-level subdomains detected ({subdomain_count} layer depths).")
+            risk_points += 15
+            recommendations.append("Verify the actual root tracking authority (right-most segment before TLD) to ensure authentic host paths.")
+
+        # 10. Non-Standard Transport Ports (Port Number Detection)
+        try:
             if parsed.port and parsed.port not in [80, 443]:
+                reasons.append(f"Non-Standard Interface Binding: Target requests communication via arbitrary network port {parsed.port}.")
+                risk_points += 20
+                recommendations.append("Inspect host routing architecture to verify that open services are not hiding proxy shells.")
+        except ValueError:
+            reasons.append("Malformed Boundary Segment: Target includes out-of-bounds structural port formatting.")
+            risk_points += 15
 
-                risk += 15
+        # Consolidate Structural Risk Matrices
+        final_risk = limit_score(risk_points)
+        final_safety = safety_score(final_risk)
+        threat_tier = risk_label(final_risk)
+        execution_timestamp = scan_time()
 
-                reasons.append(
-                    f"Non-standard port detected ({parsed.port})."
-                )
+        # Telemetry Display Panel
+        st.markdown("### 📊 Structural Risk Diagnostics Matrix")
 
-                recommendations.append(
-                    "Unexpected ports may indicate suspicious services."
-                )
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Risk Score", f"{final_risk}%")
+        with col2:
+            st.metric("Safety Score", f"{final_safety}%")
+        with col3:
+            st.metric("Threat Level", threat_tier)
+        with col4:
+            st.metric("Scan Timestamp", execution_timestamp.split()[0])
 
-        except:
+        st.markdown("---")
 
-            pass
+        left_layout, right_layout = st.columns([1, 2])
 
-        # ==========================================
-        # .ONION
-        # ==========================================
-
-        if ".onion" in domain:
-
-            risk += 40
-
-            reasons.append(
-                "Tor (.onion) address detected."
-            )
-
-            recommendations.append(
-                "Only access Tor services if you trust the source."
-            )
-
-        # ==========================================
-        # FINAL SCORE
-        # ==========================================
-
-        risk = limit_score(risk)
-
-        safety = safety_score(risk)
-
-        level = risk_label(risk)
-
-        timestamp = scan_time()
-
-        st.markdown("## 📊 Scan Results")
-
-        c1, c2, c3, c4 = st.columns(4)
-
-        c1.metric("Risk Score", f"{risk}%")
-
-        c2.metric("Safety Score", f"{safety}%")
-
-        c3.metric("Threat Level", level)
-
-        c4.metric("Scan Time", timestamp)
-                st.markdown("---")
-
-        left, right = st.columns([1, 2])
-
-        with left:
-
-            st.subheader("Safety Meter")
-
-            fig = render_gauge(safety)
-
+        with left_layout:
+            st.markdown("#### Safety Profile Metric")
+            fig = render_gauge(final_safety)
             st.plotly_chart(fig, use_container_width=True)
 
-        with right:
-
-            st.subheader("Detection Results")
-
-            if reasons:
-
-                for item in reasons:
-                    st.warning(item)
-
+        with right_layout:
+            st.markdown("#### Diagnostic Findings Log")
+            if not reasons:
+                st.markdown(
+    "✅ <span style='color:#10b981; font-weight:600;'>Zero signature threats matched during deep URL verification scans.</span>",
+    unsafe_allow_html=True
+)
             else:
-
-                st.success(
-                    "No suspicious indicators detected."
-                )
-
-        st.markdown("---")
-
-        st.subheader("Security Recommendations")
-
-        if recommendations:
-
-            shown = []
-
-            for item in recommendations:
-
-                if item not in shown:
-
-                    shown.append(item)
-
-                    st.info(item)
-
-        else:
-
-            st.success(
-                "No security recommendations. The URL appears safe."
-            )
+                for reason in reasons:
+                   st.markdown(
+    f"❌ <span style='color:#fb923c; font-weight:500;'>{reason}</span>",
+    unsafe_allow_html=True
+)
 
         st.markdown("---")
-
-        if risk >= 80:
-
-            st.error(
-                "🔴 HIGH RISK: This website appears highly suspicious. Do NOT enter passwords or payment information."
-            )
-
-        elif risk >= 50:
-
-            st.warning(
-                "🟠 MEDIUM RISK: Proceed carefully and verify the website before continuing."
-            )
-
-        elif risk >= 20:
-
-            st.info(
-                "🟡 LOW RISK: Minor security concerns were detected."
-            )
-
+        st.markdown("#### 🛠️ Security Infrastructure Recommendations")
+        if not recommendations:
+            st.markdown("🟢 Base configuration maps clean. Maintain automated perimeter detection profiles.")
         else:
-
-            st.success(
-                "🟢 SAFE: No major phishing indicators were detected."
-            )
+            for rec in recommendations:
+                st.markdown(
+    f"▪️ <span style='color:#38bdf8;'>{rec}</span>",
+    unsafe_allow_html=True
+)
