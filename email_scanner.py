@@ -1,6 +1,5 @@
 import streamlit as st
 import re
-
 from utils import (
     limit_score,
     safety_score,
@@ -12,319 +11,154 @@ from utils import (
 
 def render_email_scanner():
 
-    st.markdown("""
-    <div style="border-bottom:2px solid #334155;padding-bottom:12px;margin-bottom:20px;">
-        <h1 style="color:white;">📧 AI Email Threat Scanner</h1>
-        <p style="color:#94a3b8;">
-        Analyze suspicious emails using AI-powered phishing heuristics.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    email_text = st.text_area(
+    st.title("📧 AI Email Threat Scanner")
+    """
+    Renders the heuristic Email Threat Assessment module within the Streamlit workspace.
+    Processes textual payloads for lexical anomalies, structural indicators, and routing targets.
+    """
+    st.markdown(
+        """
+        <div style="border-bottom: 2px solid #334155; padding-bottom: 12px; margin-bottom: 25px;">
+            <h1 style="color: #f8fafc; font-weight: 700; margin-bottom: 4px;">🛡️ Email Threat Scanner</h1>
+            <p style="color: #94a3b8; font-size: 16px; margin: 0;">Heuristic payload scanning for malicious markers and indicators of compromise (IoC).</p>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
+    
+    email_content = st.text_area(
         "Paste Email Content",
         height=250,
-        placeholder="""
-From: security@paypal-alert.com
-
-Subject: Verify your account immediately
-
-Dear Customer,
-
-Your account has been suspended.
-
-Click below to verify your account.
-
-https://paypal-login-security.com
-
-Regards,
-Support Team
-"""
+        placeholder="Input raw message body or email headers for defensive evaluation..."
     )
-
-    if st.button("🔍 Scan Email", type="primary"):
-
-        if not email_text.strip():
-            st.error("Please paste an email first.")
+    
+    if st.button("Execute Core Heuristics Scan", type="primary"):
+        if not email_content.strip():
+            st.warning("Analysis halted: Text payload evaluation surface cannot be null.")
             return
 
-        risk = 0
         reasons = []
         recommendations = []
+        risk_points = 0
 
-        email = email_text.lower()
-
-        # -------------------------------------------------
-        # Suspicious Keywords
-        # -------------------------------------------------
-
+        # Heuristic 1: Targeted Keyword Matrix Evaluation
         keywords = [
-            "verify",
-            "urgent",
-            "login",
-            "password",
-            "account",
-            "bank",
-            "paypal",
-            "bitcoin",
-            "gift",
-            "free",
-            "update",
-            "click here",
-            "confirm",
-            "limited time",
-            "suspended",
-            "security alert"
+            "urgent", "verify", "password", "bank", "click", "gift", "free", 
+            "bitcoin", "login", "otp", "winner", "claim", "limited time", "update", "account"
         ]
+        matched_keywords = [kw for kw in keywords if re.search(r'\b' + re.escape(kw) + r'\b', email_content, re.IGNORECASE)]
+        
+        if matched_keywords:
+            reasons.append(f"High-risk credential harvesting/phishing flags flagged: {', '.join(matched_keywords)}")
+            risk_points += len(matched_keywords) * 10
+            recommendations.append("Exercise absolute caution. Do not click links matching financial, imperative, or urgency-based text constructs.")
 
-        found = []
+        # Heuristic 2: Plaintext Transmission Schemes (HTTP Links)
+        http_links = re.findall(r'http://[^\s]+', email_content)
+        if http_links:
+            reasons.append(f"Unencrypted protocol transport identified: Detected {len(http_links)} instance(s) of plaintext http:// schemas.")
+            risk_points += 20
+            recommendations.append("Avoid interactions with unencrypted transmission nodes (HTTP); data payload interception vector high.")
 
-        for word in keywords:
-            if word in email:
-                found.append(word)
+        # Heuristic 3: Encrypted Transport Verification (HTTPS Links)
+        # Note: Checked as context, minor risk added if excessive to identify link-heavy phishing vectors
+        https_links = re.findall(r'https://[^\s]+', email_content)
+        if len(https_links) > 3:
+            reasons.append(f"Elevated hyperlink frequency density: Contains {len(https_links)} explicit HTTPS references.")
+            risk_points += 10
+            recommendations.append("Verify structural domain alignments for explicit redirects before accessing secure HTTPS target paths.")
 
-        if found:
-            risk += len(found) * 6
-            reasons.append(
-                "Suspicious keywords detected: " +
-                ", ".join(found)
-            )
+        # Heuristic 4: Obfuscated Redirection Nodes (Shortened URLs)
+        shorteners = ["bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "is.gd", "buff.ly", "rebrand.ly"]
+        found_shorteners = [s for s in shorteners if s in email_content.lower()]
+        if found_shorteners:
+            reasons.append(f"Network proxy redirect routing found: Alias shorteners resolved ({', '.join(found_shorteners)}).")
+            risk_points += 20
+            recommendations.append("Pass all obfuscated or shortened links through an expansion utility before execution.")
 
-            recommendations.append(
-                "Never trust emails requesting urgent verification."
-            )
+        # Heuristic 5: Direct Host Network Mappings (IP Addresses)
+        ip_references = re.findall(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', email_content)
+        if ip_references:
+            reasons.append(f"Bypassed DNS mapping detected: Raw IP endpoints present ({', '.join(ip_references)}).")
+            risk_points += 25
+            recommendations.append("Flag emails routing users directly to raw network blocks rather than certified domain namespaces.")
 
-        # -------------------------------------------------
-        # URL Detection
-        # -------------------------------------------------
+        # Heuristic 6: Target Harvester Identification (Email Addresses)
+        emails_found = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', email_content)
+        if len(emails_found) > 2:
+            reasons.append(f"Data dissemination profile: Contains {len(emails_found)} cross-referenced email strings.")
+            risk_points += 5
 
-        urls = re.findall(r'https?://[^\s]+', email)
+        # Heuristic 7: Case Variance Exploitation (Excessive CAPITAL LETTERS)
+        words = email_content.split()
+        if len(words) > 8:
+            caps_words = [w for w in words if w.isupper() and len(w) > 1 and w.isalpha()]
+            if (len(caps_words) / len(words)) > 0.30:
+                reasons.append("Social engineering panic threshold matched: High concentration of UPPERCASE characters.")
+                risk_points += 15
+                recommendations.append("Do not respond to communicative pressures employing manufactured synthetic urgency profiles.")
 
-        if urls:
+        # Heuristic 8: Punctuation Abuse (Too many exclamation marks)
+        exclamation_count = email_content.count('!')
+        if exclamation_count > 3:
+            reasons.append(f"Punctuation anomalies observed: Abnormal exclamation concentration ({exclamation_count} markers).")
+            risk_points += 10
 
-            risk += 20
+        # Heuristic 9: Darknet Topology Targets (.onion links)
+        if ".onion" in email_content.lower():
+            reasons.append("Tor network hidden-service resource locator (.onion) addressed inside structural body.")
+            risk_points += 35
+            recommendations.append("Treat hidden darknet addresses inside unexpected contexts as critical infiltration vector flags.")
 
-            reasons.append(
-                f"{len(urls)} URL(s) detected inside email."
-            )
-
-            recommendations.append(
-                "Inspect every link before clicking."
-            )
-
-        # -------------------------------------------------
-        # Urgency Detection
-        # -------------------------------------------------
-
-        urgent_words = [
-            "immediately",
-            "urgent",
-            "within 24 hours",
-            "expire",
-            "warning",
-            "final notice"
-        ]
-
-        urgency = []
-
-        for word in urgent_words:
-            if word in email:
-                urgency.append(word)
-
-        if urgency:
-
-            risk += 15
-
-            reasons.append(
-                "Urgent language used to pressure the victim."
-            )
-
-            recommendations.append(
-                "Legitimate companies rarely pressure users into immediate action."
-            )
-                    # -------------------------------------------------
-        # Attachment Detection
-        # -------------------------------------------------
-
-        attachment_extensions = [
-            ".exe",
-            ".zip",
-            ".rar",
-            ".js",
-            ".scr",
-            ".bat",
-            ".cmd",
-            ".vbs",
-            ".docm",
-            ".xlsm"
-        ]
-
-        attachments = []
-
-        for ext in attachment_extensions:
-            if ext in email:
-                attachments.append(ext)
-
-        if attachments:
-
-            risk += 20
-
-            reasons.append(
-                "Potentially dangerous attachment detected: " +
-                ", ".join(attachments)
-            )
-
-            recommendations.append(
-                "Do not open unexpected email attachments."
-            )
-
-        # -------------------------------------------------
-        # Sender Analysis
-        # -------------------------------------------------
-
-        suspicious_domains = [
-            ".ru",
-            ".xyz",
-            ".top",
-            ".tk",
-            ".click",
-            ".gq"
-        ]
-
-        for domain in suspicious_domains:
-            if domain in email:
-                risk += 15
-
-                reasons.append(
-                    f"Suspicious sender domain detected ({domain})"
-                )
-
-                recommendations.append(
-                    "Verify the sender's domain before trusting the email."
-                )
-
-                break
-
-        # -------------------------------------------------
-        # Financial Scam Detection
-        # -------------------------------------------------
-
-        financial_words = [
-            "bank",
-            "credit card",
-            "payment",
-            "invoice",
-            "refund",
-            "wire transfer",
-            "bitcoin",
-            "crypto"
-        ]
-
-        finance = []
-
-        for word in financial_words:
-            if word in email:
-                finance.append(word)
-
-        if finance:
-
-            risk += 10
-
-            reasons.append(
-                "Financial keywords detected: " +
-                ", ".join(finance)
-            )
-
-            recommendations.append(
-                "Never share banking information through email."
-            )
-
-        # -------------------------------------------------
-        # AI Score Calculation
-        # -------------------------------------------------
-
-        risk = limit_score(risk)
-
-        safety = safety_score(risk)
-
-        level = risk_label(risk)
-
+        # Finalize Telemetry Calculations
+        calc_risk = limit_score(risk_points)
+        calc_safety = safety_score(calc_risk)
+        label_threat = risk_label(calc_risk)
         timestamp = scan_time()
 
-        st.markdown("## 📊 Scan Results")
+        # Render Metrics and Telemetry Panel
+        st.markdown("### 📊 Scan Summary & Telemetry Matrix")
+        
+        m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+        with m_col1:
+            st.metric("Calculated Risk Index", f"{calc_risk}%")
+        with m_col2:
+            st.metric("Calculated Safety Index", f"{calc_safety}%")
+        with m_col3:
+            st.metric("Assigned Threat Tier", label_threat)
+        with m_col4:
+            st.metric("System Timestamp", timestamp.split()[0])
 
-        c1, c2, c3, c4 = st.columns(4)
+        st.markdown("---")
 
-        c1.metric("Risk Score", f"{risk}%")
-
-        c2.metric("Safety Score", f"{safety}%")
-
-        c3.metric("Threat Level", level)
-
-        c4.metric("Scan Time", timestamp)
-                st.markdown("---")
-
-        left, right = st.columns([1, 2])
-
-        with left:
-
-            st.subheader("Safety Meter")
-
-            fig = render_gauge(safety)
-
+        c_left, c_right = st.columns([1, 2])
+        
+        with c_left:
+            st.markdown("#### Safety Profile Visualization")
+            fig = render_gauge(calc_safety)
             st.plotly_chart(fig, use_container_width=True)
 
-        with right:
-
-            st.subheader("Detection Results")
-
-            if reasons:
-
-                for reason in reasons:
-                    st.error(reason)
-
+        with c_right:
+            st.markdown("#### Heuristic Diagnostic Log")
+            if not reasons:
+               st.markdown(
+    "✅ <span style='color:#10b981; font-weight:600;'>Zero signature threats matched during deep static analysis execution.</span>",
+    unsafe_allow_html=True
+)
             else:
-
-                st.success(
-                    "No phishing indicators were detected."
-                )
+                for reason in reasons:
+                   st.markdown(
+    f"❌ <span style='color:#f43f5e; font-weight:500;'>{reason}</span>",
+    unsafe_allow_html=True
+)
 
         st.markdown("---")
-
-        st.subheader("Security Recommendations")
-
-        if recommendations:
-
-            shown = []
-
+        st.markdown("#### 🛠️ Security Deficit Remediation Plan")
+        if not recommendations:
+            st.markdown("🟢 System posture healthy. Maintain standard data tracking protections.")
+        else:
             for rec in recommendations:
-
-                if rec not in shown:
-                    shown.append(rec)
-                    st.info(rec)
-
-        else:
-
-            st.success(
-                "This email appears safe based on the current heuristic analysis."
-            )
-
-        st.markdown("---")
-
-        if risk >= 80:
-
-            st.error(
-                "🔴 HIGH RISK: This email is highly suspicious. Do NOT click links, open attachments, or provide personal information."
-            )
-
-        elif risk >= 50:
-
-            st.warning(
-                "🟠 MEDIUM RISK: Proceed carefully. Verify the sender before taking any action."
-            )
-
-        else:
-
-            st.success(
-                "🟢 LOW RISK: No major phishing indicators were detected."
-            )
+                st.markdown(
+    f"▪️ <span style='color:#38bdf8;'>{rec}</span>",
+    unsafe_allow_html=True
+)
